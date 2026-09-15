@@ -37,13 +37,19 @@ flutterfire configure
 Deploy the edge function and set your Firebase secret key via the Supabase CLI:
 
 supabase login
+
 supabase link --project-ref YOUR-PROJECT-REF
+
 supabase functions deploy notify-new-notice --no-verify-jwt
-supabase secrets set FCM_SERVER_KEY=your_firebase_server_key
+
+supabase secrets set 
+
+FCM_SERVER_KEY=your_firebase_server_key
 
 In the Supabase Dashboard, create a Database Webhook listening to the notices table on INSERT events routed to the notify-new-notice edge function.
 5. Hosting the Frontend ($0 Cost)
 Build the web release package:
+
 flutter build web --release
 
 Deploy using either option:

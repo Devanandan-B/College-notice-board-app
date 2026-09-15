@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/fcm_service.dart';
 import 'login_screen.dart';
 import 'notice_feed_screen.dart';
 
@@ -14,8 +13,6 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = Supabase.instance.client.auth.currentSession;
         if (session != null) {
-          // Fire-and-forget: register this device for push notifications.
-          FcmService.init();
           return const NoticeFeedScreen();
         }
         return const LoginScreen();

@@ -1,0 +1,23 @@
+name: college_notice_board
+description: Free-tier college notice board (Flutter + Supabase)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.5.6
+  firebase_core: ^3.1.0
+  firebase_messaging: ^15.0.2
+  url_launcher: ^6.3.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

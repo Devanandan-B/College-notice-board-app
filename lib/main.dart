@@ -3,8 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/auth_gate.dart';
 
 // --- FILL THESE IN from Supabase Dashboard -> Project Settings -> API ---
-const supabaseUrl = 'https://YOUR-PROJECT-REF.supabase.co';
-const supabaseAnonKey = 'YOUR-ANON-PUBLIC-KEY';
+const supabaseUrl = 'https://thvfvhjjhiolvrfpmcst.supabase.co';
+const supabaseAnonKey = 'sb_publishable_XTkkFFOuvX5EWRz-pv-ziQ_aO7Y-aNQ';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

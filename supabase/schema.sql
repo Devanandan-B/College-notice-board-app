@@ -2,40 +2,57 @@
 -- COLLEGE NOTICE BOARD — SUPABASE SCHEMA
 -- ============================================================
 
+
+-- ============================================================
 -- 1. PROFILES TABLE
+-- ============================================================
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
   role text not null default 'student'
-    check (role in ('student','admin')),
+    check (role in ('student', 'admin')),
   fcm_token text,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles enable row level security;
 
+
+-- Remove old policies first so this script can be run again
+drop policy if exists "profiles_select_all" on public.profiles;
+drop policy if exists "profiles_update_own_non_role_fields" on public.profiles;
+
+
 -- Anyone logged in can read profiles
 create policy "profiles_select_all"
-  on public.profiles for select
-  to authenticated
-  using (true);
+on public.profiles
+for select
+to authenticated
+using (true);
+
 
 -- Users can update their own profile,
--- but cannot change their role.
+-- but cannot change their role
 create policy "profiles_update_own_non_role_fields"
-  on public.profiles for update
-  to authenticated
-  using (auth.uid() = id)
-  with check (
-    auth.uid() = id
-    and role = (
-      select p.role
-      from public.profiles p
-      where p.id = auth.uid()
-    )
-  );
+on public.profiles
+for update
+to authenticated
+using (auth.uid() = id)
+with check (
+  auth.uid() = id
+  and role = (
+    select p.role
+    from public.profiles p
+    where p.id = auth.uid()
+  )
+);
 
--- Auto-create profile when a user signs up
+
+-- ============================================================
+-- AUTO-CREATE PROFILE WHEN USER SIGNS UP
+-- ============================================================
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -48,22 +65,24 @@ begin
     new.id,
     new.raw_user_meta_data->>'full_name',
     'student'
-  );
+  )
+  on conflict (id) do nothing;
 
   return new;
 end;
 $$;
 
+
 drop trigger if exists on_auth_user_created on auth.users;
 
 create trigger on_auth_user_created
-  after insert on auth.users
-  for each row
-  execute procedure public.handle_new_user();
+after insert on auth.users
+for each row
+execute function public.handle_new_user();
 
 
 -- ============================================================
--- ENFORCE MAXIMUM 30 ADMIN/FACULTY ACCOUNTS
+-- 2. ADMIN/FACULTY CAP — MAXIMUM 30
 -- ============================================================
 
 create or replace function public.enforce_admin_cap()
@@ -74,7 +93,7 @@ set search_path = public
 as $$
 begin
 
-  -- INSERT: check if the new row is an admin
+  -- INSERTING A NEW ADMIN
   if TG_OP = 'INSERT' and new.role = 'admin' then
 
     if (
@@ -82,38 +101,47 @@ begin
       from public.profiles
       where role = 'admin'
     ) >= 30 then
+
       raise exception 'Admin/Faculty seat limit (30) reached';
+
     end if;
 
-  -- UPDATE: only check when changing from non-admin to admin
-  elsif TG_OP = 'UPDATE'
-        and new.role = 'admin'
-        and old.role <> 'admin' then
+  end if;
+
+
+  -- CHANGING STUDENT -> ADMIN
+  if TG_OP = 'UPDATE'
+     and new.role = 'admin'
+     and old.role <> 'admin' then
 
     if (
       select count(*)
       from public.profiles
       where role = 'admin'
     ) >= 30 then
+
       raise exception 'Admin/Faculty seat limit (30) reached';
+
     end if;
 
   end if;
+
 
   return new;
 end;
 $$;
 
+
 drop trigger if exists trg_admin_cap on public.profiles;
 
 create trigger trg_admin_cap
-  before insert or update on public.profiles
-  for each row
-  execute procedure public.enforce_admin_cap();
+before insert or update on public.profiles
+for each row
+execute function public.enforce_admin_cap();
 
 
 -- ============================================================
--- HELPER: CHECK WHETHER CURRENT USER IS ADMIN
+-- 3. CHECK WHETHER CURRENT USER IS ADMIN
 -- ============================================================
 
 create or replace function public.is_admin()
@@ -133,7 +161,7 @@ $$;
 
 
 -- ============================================================
--- 2. CLUBS TABLE
+-- 4. CLUBS TABLE
 -- ============================================================
 
 create table if not exists public.clubs (
@@ -144,20 +172,28 @@ create table if not exists public.clubs (
 
 alter table public.clubs enable row level security;
 
+
+drop policy if exists "clubs_select_all" on public.clubs;
+drop policy if exists "clubs_admin_write" on public.clubs;
+
+
 create policy "clubs_select_all"
-  on public.clubs for select
-  to authenticated
-  using (true);
+on public.clubs
+for select
+to authenticated
+using (true);
+
 
 create policy "clubs_admin_write"
-  on public.clubs for all
-  to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+on public.clubs
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 
 -- ============================================================
--- 3. NOTICES TABLE
+-- 5. NOTICES TABLE
 -- ============================================================
 
 create table if not exists public.notices (
@@ -173,45 +209,71 @@ create table if not exists public.notices (
 
 alter table public.notices enable row level security;
 
+
+drop policy if exists "notices_select_all" on public.notices;
+drop policy if exists "notices_admin_insert" on public.notices;
+drop policy if exists "notices_admin_update" on public.notices;
+drop policy if exists "notices_admin_delete" on public.notices;
+
+
 -- Logged-in users can read notices
 create policy "notices_select_all"
-  on public.notices for select
-  to authenticated
-  using (true);
+on public.notices
+for select
+to authenticated
+using (true);
+
 
 -- Only admins can create notices
 create policy "notices_admin_insert"
-  on public.notices for insert
-  to authenticated
-  with check (
-    public.is_admin()
-    and created_by = auth.uid()
-  );
+on public.notices
+for insert
+to authenticated
+with check (
+  public.is_admin()
+  and created_by = auth.uid()
+);
+
 
 -- Only admins can update notices
 create policy "notices_admin_update"
-  on public.notices for update
-  to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+on public.notices
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 
 -- Only admins can delete notices
 create policy "notices_admin_delete"
-  on public.notices for delete
-  to authenticated
-  using (public.is_admin());
+on public.notices
+for delete
+to authenticated
+using (public.is_admin());
 
 
 -- ============================================================
--- REALTIME
+-- 6. REALTIME
 -- ============================================================
 
-alter publication supabase_realtime
-add table public.notices;
-
+-- Add notices to Realtime only if it isn't already there.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notices'
+  ) then
+    alter publication supabase_realtime
+    add table public.notices;
+  end if;
+end
+$$;
 
 -- ============================================================
--- SEED CLUBS
+-- 7. SEED CLUBS
 -- ============================================================
 
 insert into public.clubs (name, description)
